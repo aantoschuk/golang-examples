@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link rel="stylesheet" href="/static/css/style.css">
+   </head>
+   <body>
+       <h1>Url Shortener</h1>
+       <form class="form" method="POST">
+           <label>Paste url here</label>
+           <input type="url" name="url" />
+           <button type="submit" class="button">Submit</button>
+       </form>
+
+       {{ if .Formated }}
+       <p>{{ .Formated }}
+       {{ end }}
+    </body>
+</html>
