@@ -1,23 +1,61 @@
-<input id="input" type="text" />
+<input id="input" type="text" oninput="onChange()"/>
 <button onclick="send()">Send</button>
 <pre id="output"></pre>
 
 <script>
+    // Declare socket variable globally
+    var socket;
+
+    // Function to connect to WebSocket server
+    const connect = () => {
+        socket = new WebSocket("ws://localhost:8000/echo");
+
+        socket.onopen = function () {
+            output.innerHTML += "Status: Connected\n";
+        };
+
+        socket.onmessage = function (e) {
+            output.innerHTML += "Server: " + e.data + "\n";
+        };
+
+        socket.onclose = function(e) {
+            output.innerHTML += "Connection closed.\n";
+        };
+
+        socket.onerror = function(error) {
+            output.innerHTML += "WebSocket error: " + error.message + "\n";
+        };
+        return socket
+    };
+
+    // Get elements from DOM
     var input = document.getElementById("input");
     var output = document.getElementById("output");
-    var socket = new WebSocket("ws://localhost:8000/echo");
 
-    socket.onopen = function () {
-        output.innerHTML += "Status: Connected\n";
-    };
+    const onChange = () => {
+        if(socket.readyState === WebSocket.CLOSED){
+            output.innerHTML += "Recconecting\n"
+            connect()
+        }
+    }
 
-    socket.onmessage = function (e) {
-        output.innerHTML += "Server: " + e.data + "\n";
-    };
+    // Initialize connection
+    connect();
 
+    // Function to send data to the WebSocket server
     function send() {
-        socket.send(input.value);
-        input.value = "";
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(input.value);
+            input.value = ""; // Clear input field
+        } else {
+            output.innerHTML += "WebSocket is not open. Retrying...\n";
+            // Wait for the connection to be open and try again after 2 seconds
+            setTimeout(() => {
+                socket.send(input.value);
+                input.value = "";
+            }, 2000);
+        }
     }
 </script>
+
 
