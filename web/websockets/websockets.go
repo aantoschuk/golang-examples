@@ -14,7 +14,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 	CheckOrigin: func (r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		return "http://localhost:8000" == origin 
+		return origin  ==  "http://localhost:8000"
 	},
 	// Wait for the WS handshake for no more then 10secs
 	// If the Handshake takes longer, abort the connection attemp
