@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -11,38 +13,38 @@ import (
 
 const (
 	// Time allowed to write a message to the peer.
-	writeWait =			10 * time.Second
+	writeWait = 10 * time.Second
 	// Time allowed to read the next pong message from the peer.
-	pongWait =			60 * time.Second
+	pongWait = 60 * time.Second
 	// Send pings to peer with this period. Must be less than pongWait
-	pingPeriod =		(pongWait * 9) /10 
+	pingPeriod = (pongWait * 9) / 10
 	// Maximum message size allowed from peer.
-	maxMessageSize =	512
+	maxMessageSize = 512
 )
 
 var (
-	newline =	[]byte{'\n'}
-	space =		[]byte{' '}
+	newline = []byte{'\n'}
+	space   = []byte{' '}
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:		1024,
-	WriteBufferSize:	1024,
-	CheckOrigin:		func (r *http.Request) bool {
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		// frontend app
-		return origin == "http://localhost:3000"
+		// Check whether origin is allowed or not
+		return slices.Contains(OriginAllowlist, origin)
 	},
-	HandshakeTimeout:	time.Duration(10 * time.Second),
-	EnableCompression:	true,
+	HandshakeTimeout:  time.Duration(10 * time.Second),
+	EnableCompression: true,
 }
 
 type Client struct {
-	hub		*Hub
+	hub *Hub
 	// The websocket connection
-	conn	*websocket.Conn
+	conn *websocket.Conn
 	// Buffered channel of outbound messages.
-	send	chan []byte
+	send chan []byte
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -51,8 +53,8 @@ type Client struct {
 // ensures that there is at most one reader on a connection by executing all
 // read from this goroutine.
 func (c *Client) readPump() {
-	defer func () {
-		c.hub.unregister <-c
+	defer func() {
+		c.hub.unregister <- c
 		c.conn.Close()
 	}()
 
@@ -64,33 +66,33 @@ func (c *Client) readPump() {
 	})
 
 	for {
-		_,message, err := c.conn.ReadMessage()
+		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v",err)
+				log.Printf("error: %v", err)
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		message = bytes.TrimSpace(bytes.ReplaceAll(message, newline, space))
 		c.hub.broadcast <- message
 	}
 }
 
 // writePump pumps messages from the hub to the websocket connection.
 //
-// A goroutine running writePumpis started for each connection. The 
+// A goroutine running writePumpis started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) writePump () {
+func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
-	defer func(){
+	defer func() {
 		ticker.Stop()
 		c.conn.Close()
 	}()
 
 	for {
 		select {
-		case message, ok := <- c.send:
+		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// THe hub closed the channel.
@@ -107,12 +109,12 @@ func (c *Client) writePump () {
 
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
-			for i := 0;i < n; i++ {
+			for i := 0; i < n; i++ {
 				w.Write(newline)
 				w.Write(<-c.send)
 			}
 
-			if err := w.Close(); err != nil  {
+			if err := w.Close(); err != nil {
 				return
 			}
 		case <-ticker.C:
@@ -126,6 +128,7 @@ func (c *Client) writePump () {
 
 // serveWS handles websocket requests from the peer
 func serveWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	fmt.Println("serve")
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -138,6 +141,4 @@ func serveWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	// new goroutines.
 	go client.writePump()
 	go client.readPump()
-
 }
-

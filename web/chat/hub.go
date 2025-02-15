@@ -1,6 +1,8 @@
 package main
 
-// Maintains the set of active clients and broadcasts messages to the 
+import "fmt"
+
+// Maintains the set of active clients and broadcasts messages to the
 // clients.
 type Hub struct {
 	// Registered clients
@@ -37,6 +39,7 @@ func (h *Hub) run() {
 			}
 
 		case message := <-h.broadcast:
+			fmt.Println(message)
 			for client := range h.clients {
 				select {
 				case client.send <- message:
