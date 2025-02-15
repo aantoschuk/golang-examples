@@ -28,3 +28,7 @@ func main() {
 	err := http.ListenAndServe(":8000", nil)
 	log.Fatal("Listen and Serve: ", err)
 }
+
+// TODO: Improve porject structure
+// FEATURE: add registration
+// FEATURE: Each message should be associated with the user who sent it
